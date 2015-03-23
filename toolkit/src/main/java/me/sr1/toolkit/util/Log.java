@@ -9,6 +9,7 @@ import android.widget.Toast;
  * 2. 支持输出log的同时使用Toast弹出提示框，可以通过全局设置开启或关闭Toast功能。
  * 3. 不需要指定TAG，将当前实例传入即可，将取此实例的类名作为TAG输出。
  * 4. 支持在静态方法里使用时，传入类.class，将取类名作为TAG输出
+ * 5. 支持在调试模式下输出方法名和行数，idea来自：https://github.com/MustafaFerhan/DebugLog
  * Created by sr1 on 15/3/19.
  */
 public class Log {
@@ -26,15 +27,17 @@ public class Log {
     public static final int ASSERT = 6;
 
     private static int sLevel = DEBUG;
+    private static boolean sIsDebugModel = true;
     private static boolean sIsAllowToast = true;
     private static Context sContext;
 
 
-    public static void initial(int level, boolean isAllowToast, Context applicationContext) {
+    public static void initial(int level, boolean isDebugModel, boolean isAllowToast, Context applicationContext) {
         if (level > 6 || level < 1) {
             return;
         } else {
             sLevel = level;
+            sIsDebugModel = isDebugModel;
             sIsAllowToast = isAllowToast;
             sContext = applicationContext;
         }
@@ -141,8 +144,16 @@ public class Log {
     }
 
     private static void log(int level, Class cls, String msg, boolean isNeedToast) {
+
+        String extraInfo = "";
+        if (sIsDebugModel) {
+            extraInfo = getDebugInfo(new Throwable().getStackTrace());
+        }
+
         String tag =cls.getSimpleName();
         String message = (msg == null) ? "message is null" : msg;
+        message = extraInfo + message;
+
         if (sLevel <= level) {
 
             switch (level) {
@@ -156,8 +167,6 @@ public class Log {
 
             if(sIsAllowToast && isNeedToast) {
                 makeToast(String.format("[%s] %s", tag, message));
-            } else {
-                android.util.Log.w(Log.class.getCanonicalName(), "fail to make toast: context not set.");
             }
         }
     }
@@ -165,6 +174,24 @@ public class Log {
     private static void makeToast(String message) {
         if (sContext != null) {
             Toast.makeText(sContext, message, Toast.LENGTH_SHORT).show();
+        } else {
+            android.util.Log.w(Log.class.getCanonicalName(), "fail to make toast: context not set.");
         }
+    }
+
+    private static String getDebugInfo(StackTraceElement[] elements) {
+
+        for (StackTraceElement element : elements) {
+            if (!element.getClassName().equalsIgnoreCase(Log.class.getCanonicalName())) {
+                StringBuilder stringBuilder = new StringBuilder();
+                stringBuilder.append("[");
+                stringBuilder.append(element.getMethodName());
+                stringBuilder.append(":");
+                stringBuilder.append(element.getLineNumber());
+                stringBuilder.append("]");
+                return stringBuilder.toString();
+            }
+        }
+        return "";
     }
 }
